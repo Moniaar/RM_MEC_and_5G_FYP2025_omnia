@@ -1,0 +1,25 @@
+[33m4b4bc2a[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: Updated .gitignore to ignore large .so files
+[33m5f49238[m HEAD@{1}: filter-branch: rewrite
+[33m0036349[m[33m ([m[mrefs/original/refs/heads/main[m[33m)[m HEAD@{2}: commit: Ignore large .so files
+[33me9ffbfe[m HEAD@{3}: commit: Removed large file from tracking
+[33m7f6bd85[m HEAD@{4}: commit: Restore .gitignore to ignore large files
+[33m558fa11[m HEAD@{5}: commit: alrooooooob
+[33m5aa1d4d[m HEAD@{6}: commit: done
+[33m6eaeef6[m HEAD@{7}: commit: hi
+[33md49596b[m HEAD@{8}: commit: run 4
+[33mfcc17e4[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[mrefs/original/refs/remotes/origin/main[m[33m)[m HEAD@{9}: commit: run 4
+[33m6dcee60[m HEAD@{10}: commit: run 3
+[33m6853cf0[m HEAD@{11}: commit: run 2
+[33ma9e84db[m HEAD@{12}: commit: run build file
+[33m717c0df[m HEAD@{13}: commit: check
+[33m89c9711[m HEAD@{14}: commit: run build
+[33m0861dad[m HEAD@{15}: commit: done
+[33mee178c0[m HEAD@{16}: pull --tags origin main: Fast-forward
+[33m129188f[m HEAD@{17}: commit: yes
+[33m69b51b5[m HEAD@{18}: commit: ns3-2
+[33m97e43d0[m HEAD@{19}: commit: ns3
+[33m9440e5d[m HEAD@{20}: commit: done
+[33mbc5845e[m HEAD@{21}: pull --tags origin main: Fast-forward
+[33m3344443[m HEAD@{22}: commit: hello
+[33m777f79b[m HEAD@{23}: pull: Fast-forward
+[33m2892b3c[m HEAD@{24}: clone: from https://github.com/AsiaEasa/RM_MEC_and_5G_FYP2025.git
