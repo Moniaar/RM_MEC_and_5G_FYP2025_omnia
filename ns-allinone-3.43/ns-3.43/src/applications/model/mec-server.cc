@@ -3,6 +3,8 @@
 #include "ns3/simulator.h"
 #include "ns3/log.h"
 
+// Defines a logging component for the MecServer class. This allows controlled logging and debugging output in ns-3 using different log levels (e.g., NS_LOG_INFO, NS_LOG_DEBUG).
+// Seconed function Ensures that MecServer is properly registered in the ns-3 TypeId system, enabling features like attribute configuration and runtime type checking.
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE("MecServer");
