@@ -103,3 +103,18 @@ If the issue persists, try running NetAnim in **offscreen mode**:
 This will let you generate animation traces without displaying the UI.
 
 ---
+### Which one of these is the MEC server node?:
+s(interfaces.GetAddress(iotNodes.GetN() - 1), port));
+To:
+
+cpp
+Copy
+Edit
+clientSocket->Connect(InetSocketAddress(interfaces.GetAddress(numIoTDevices), port));
+This ensures the IoT devices send their specs to the MEC server (the last node in mecServerNode), not to another IoT device.
+
+Answer: Which Node is the Server?
+The MEC server is the last node created, which is mecServerNode.Get(0).
+Since iotNodes.Create(numIoTDevices); creates 4 IoT nodes (indices 0 to 3), and mecServerNode.Create(1); creates one more node (index 4), the MEC server should be node 4.
+
+### RF or Pission and why?
