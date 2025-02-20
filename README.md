@@ -12,3 +12,94 @@
 3. export LIBGL_ALWAYS_INDIRECT=1
 4. sudo apt install x11-apps
 5. Run ./NetAnim  :).
+
+## What if Netanim doesn't start?
+we have multiple options to follow:
+It looks like **NetAnim** is failing to connect to the **X server** due to missing authentication or incorrect display settings. Follow these steps to fix it:
+
+---
+
+### **1. Verify Your X Server Connection**
+Since you're using `export DISPLAY=172.26.192.1:0.0`, ensure that:
+- **The IP address is correct** (`172.26.192.1` should be your host machine's IP).
+- **Your X server is running** on your host machine (if using WSL, you need an X server like **VcXsrv** or **X410**).
+
+To check if your X server is running, try:
+
+```sh
+xclock
+```
+
+If `xclock` does not start, the issue is with your X server.
+
+---
+
+### **2. Allow X Server Connections**
+Run the following command **on your host machine** (not inside WSL or the remote machine):
+
+```sh
+xhost +local:*
+```
+
+If you're using **WSL**, try:
+
+```sh
+export DISPLAY=:0
+```
+
+Then, re-run NetAnim:
+
+```sh
+./NetAnim
+```
+
+---
+
+### **3. Check Qt Platform Plugin**
+The error mentions:
+
+```
+Could not load the Qt platform plugin "xcb"
+```
+
+Ensure that the required Qt dependencies are installed:
+
+```sh
+sudo apt install qt5-default qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+```
+
+If already installed, explicitly specify the Qt plugin when running NetAnim:
+
+```sh
+./NetAnim -platform xcb
+```
+
+---
+
+### **4. Run NetAnim Without Display Variables**
+If you're on **a local Linux machine**, try resetting the `DISPLAY` variable:
+
+```sh
+unset DISPLAY
+./NetAnim
+```
+
+If you're using **WSL2**, use:
+
+```sh
+export DISPLAY=:0
+./NetAnim
+```
+
+---
+
+### **5. Run in Offscreen Mode (If Needed)**
+If the issue persists, try running NetAnim in **offscreen mode**:
+
+```sh
+./NetAnim -platform offscreen
+```
+
+This will let you generate animation traces without displaying the UI.
+
+---
