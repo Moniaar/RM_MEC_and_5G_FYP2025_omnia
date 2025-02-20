@@ -104,13 +104,11 @@ This will let you generate animation traces without displaying the UI.
 
 ---
 ### Which one of these is the MEC server node?:
-s(interfaces.GetAddress(iotNodes.GetN() - 1), port));
-To:
-
-cpp
-Copy
-Edit
+instead of this in scratch : ```s(interfaces.GetAddress(iotNodes.GetN() - 1), port));```
+ I put:
+```
 clientSocket->Connect(InetSocketAddress(interfaces.GetAddress(numIoTDevices), port));
+```
 This ensures the IoT devices send their specs to the MEC server (the last node in mecServerNode), not to another IoT device.
 
 Answer: Which Node is the Server?
