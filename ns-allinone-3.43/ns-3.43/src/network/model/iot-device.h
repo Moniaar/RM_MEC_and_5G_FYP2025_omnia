@@ -19,6 +19,7 @@ public:
     double GetEnergy() const;
     double GetBandwidth() const;
     bool HasWirelessCharging() const;
+    void UpdateEnergy(double energyConsumed, int chargingEnergy);
 
     virtual void StartApplication() override;  // Correct function signature
     void ReceiveModelUpdate(Ptr<Socket> socket);
@@ -28,12 +29,17 @@ private:
     double m_energy;
     double m_bandwidth;
     bool m_wirelessCharging;
+    double m_initialEnergy;
+    double m_chargingRate;
 
     Ptr<Socket> m_socket;
     uint16_t m_port;  // Port number for communication
 };
 
 std::vector<IoTDevice> GenerateIoTDevices(int numDevices);
+double ComputeEnergyConsumption(double cpuFreq, double tau, double mu, double G);
+int GenerateChargingEnergy(double avgRate);
+
 
 } // namespace ns3
 
