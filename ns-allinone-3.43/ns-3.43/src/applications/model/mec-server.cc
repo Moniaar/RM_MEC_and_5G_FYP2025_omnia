@@ -1,10 +1,9 @@
 #include "ns3/mec-server.h"
 #include "ns3/socket-factory.h"
 #include "ns3/simulator.h"
+#include "ns3/socket.h"
 #include "ns3/log.h"
 
-// Defines a logging component for the MecServer class. This allows controlled logging and debugging output in ns-3 using different log levels (e.g., NS_LOG_INFO, NS_LOG_DEBUG).
-// Seconed function Ensures that MecServer is properly registered in the ns-3 TypeId system, enabling features like attribute configuration and runtime type checking.
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE("MecServer");
@@ -23,17 +22,25 @@ MecServer::MecServer() {}
 MecServer::~MecServer() {}
 
 void MecServer::StartApplication() {
-  NS_LOG_INFO("MEC Server Started");
+    if (!m_socket) {
+        m_socket = Socket::CreateSocket(GetNode(), TypeId::LookupByName("ns3::UdpSocketFactory"));
+        Inet6SocketAddress local = Inet6SocketAddress(Ipv6Address::GetAny(), m_port);
+        m_socket->Bind(local);
+    }
 
-  if (!m_socket) {
-    TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
-    m_socket = Socket::CreateSocket(GetNode(), tid);
-    m_socket->Bind(InetSocketAddress(Ipv4Address::GetAny(), 8080));
-
-    // Fix: Use HandleRead method only if it's declared in mec-server.h
-    m_socket->SetRecvCallback(MakeCallback(&MecServer::HandleRead, this));
-  }
+    SendModelUpdate(); // Send initial model update
 }
+
+void MecServer::SendModelUpdate() {
+    std::string modelWeights = "UpdatedModelWeights"; // Simulated model update
+    Ptr<Packet> packet = Create<Packet>((uint8_t*)modelWeights.c_str(), modelWeights.length());
+
+    Inet6SocketAddress remote = Inet6SocketAddress(m_broadcastAddress, m_port);
+    m_socket->SendTo(packet, 0, remote);
+
+    std::cout << "Sent model update to IoT devices." << std::endl;
+}
+
 
 void MecServer::StopApplication() {
   NS_LOG_INFO("MEC Server Stopped");
