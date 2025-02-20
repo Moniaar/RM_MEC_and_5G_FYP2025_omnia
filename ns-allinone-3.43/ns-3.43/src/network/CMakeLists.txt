@@ -27,6 +27,7 @@ set(source_files
     model/tag-buffer.cc
     model/tag.cc
     model/trailer.cc
+    model/iot-device.cc
     utils/address-utils.cc
     utils/bit-deserializer.cc
     utils/bit-serializer.cc
@@ -101,6 +102,7 @@ set(header_files
     model/tag-buffer.h
     model/tag.h
     model/trailer.h
+    model/iot-device.h
     test/header-serialization-test.h
     utils/address-utils.h
     utils/bit-deserializer.h
