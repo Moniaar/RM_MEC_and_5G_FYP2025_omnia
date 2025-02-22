@@ -140,4 +140,53 @@ This is is due to the functional roles of each component in the system.
 
 ---
 
+## What to do if Netanim is misbehaving?
+This error suggests an issue with Qt, which NetAnim relies on. Here are a few things you can try to fix it:
+
+### 1. **Ensure Required Qt Packages Are Installed**
+Run:
+```bash
+sudo apt update
+sudo apt install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+```
+Then, recompile NetAnim:
+```bash
+cd ~/ns-allinone-3.43/netanim-3.109
+qmake NetAnim.pro
+make clean
+make
+```
+Try running `./NetAnim` again.
+
+---
+
+### 2. **Run With Software Rendering**
+Some Qt applications crash due to OpenGL issues. Try launching NetAnim with:
+```bash
+export QT_XCB_GL_INTEGRATION=none
+./NetAnim
+```
+
+---
+
+### 3. **Check for Missing Dependencies**
+Use:
+```bash
+ldd NetAnim | grep "not found"
+```
+If any dependencies are missing, install them.
+
+---
+
+### 4. **Run With Debugger**
+To get more details on the error:
+```bash
+gdb ./NetAnim
+run
+```
+If it crashes, type `bt` (backtrace) to analyze the issue.
+
+---
+
+
 ### RF or Pission and why?
