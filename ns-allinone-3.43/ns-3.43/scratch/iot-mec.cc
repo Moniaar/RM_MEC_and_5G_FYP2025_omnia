@@ -32,12 +32,14 @@ int main(int argc, char *argv[]) {
     LogComponentEnable("IoT_FL_Simulation", LOG_LEVEL_INFO);
     LogComponentEnable("IoTDevice", LOG_LEVEL_INFO); // ----------------- Add this to allow the iot-device to use it --------
     LogComponentEnable("MecServer", LOG_LEVEL_INFO); // ----------------- Add this to allow the mec-server to use it --------
+    // Create IOT and server nodes
     int numIoTDevices = 4;
 
     NodeContainer iotNodes, mecServerNode;
     iotNodes.Create(numIoTDevices);
     mecServerNode.Create(1);
 
+    // Setup Point-to-Point Links with 10 Mbps bandwidth 2 ms delay.
     PointToPointHelper p2p;
     p2p.SetDeviceAttribute("DataRate", StringValue("10Mbps"));
     p2p.SetChannelAttribute("Delay", StringValue("2ms"));
