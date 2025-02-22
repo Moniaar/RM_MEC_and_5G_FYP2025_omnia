@@ -115,4 +115,29 @@ Answer: Which Node is the Server?
 The MEC server is the last node created, which is mecServerNode.Get(0).
 Since iotNodes.Create(numIoTDevices); creates 4 IoT nodes (indices 0 to 3), and mecServerNode.Create(1); creates one more node (index 4), the MEC server should be node 4.
 
+## Why **the MEC (Multi-access Edge Computing) server is implemented at the application layer** while **IoT devices are handled in the network layer**?:
+This is is due to the functional roles of each component in the system.  
+
+### **1️⃣ MEC Server at the Application Layer**  
+- The **MEC server provides services**, such as **processing, computation, and storage** for IoT devices.  
+- It acts as an **edge-cloud system**, meaning it runs application-layer logic (e.g., handling requests, aggregating data, distributing tasks).  
+- Since it is handling **higher-level tasks** (not just forwarding packets but making decisions on the received data), it fits within the **application layer**.  
+- It typically uses **sockets** to communicate with IoT devices, just like a web server handling client requests.  
+
+✅ **Example**:  
+- A **MEC server** can receive **sensor data from IoT devices**, process it using AI models, and then send back a response.  
+
+---
+
+### **2️⃣ IoT Devices at the Network Layer**  
+- IoT devices mainly handle **data transmission, connectivity, and routing**, which are **network layer** concerns.  
+- They typically interact with the **MEC server via network protocols** (e.g., TCP, UDP, IPv4, IPv6).  
+- They **don’t process or store data significantly**; instead, they **send data** to the MEC server.  
+- IoT devices require **mobility models** and **networking modules**, so their behavior is mainly defined within the network layer.  
+
+✅ **Example**:  
+- A **temperature sensor** in an IoT device **collects data**, packages it into a **network packet**, and **transmits it** to the MEC server.  
+
+---
+
 ### RF or Pission and why?
