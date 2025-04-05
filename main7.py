@@ -16,7 +16,7 @@ EPSILON = 0.1  # معدل الاستكشاف الابتدائي (ε-greedy: 0.1 
 EPSILON_MAX = 1.0  # الحد الأقصى لـ Epsilon
 EPSILON_GROWTH = 1.001  # معدل الزيادة التدريجي لـ Epsilon
 TARGET_UPDATE = 10  # عدد الحلقات قبل تحديث الشبكة الهدف
-NUM_EPISODES = 7000  # عدد جولات التدريب العالمية (G = 7000)
+NUM_EPISODES = 20  # عدد جولات التدريب العالمية (G = 7000)
 NUM_DEVICES = 10  # عدد الأجهزة (10 IoT Devices)
 NUM_SELECTED_DEVICES = 4  # عدد الأجهزة المختارة (η = 4)
 FEATURES_PER_DEVICE = 3  # الميزات لكل جهاز (Latency, Bandwidth, Energy Consumption)
@@ -51,16 +51,23 @@ class CNN(nn.Module):
 class GlobalModel(nn.Module):
     def __init__(self):
         super(GlobalModel, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1)  # لمعالجة بيانات MNIST (1 قناة)
-        self.pool = nn.MaxPool2d(kernel_size=(2, 2))
-        self.fc1 = nn.Linear(16 * 14 * 14, 128)  # افتراض إدخال MNIST (28×28)
-        self.fc2 = nn.Linear(128, 10)  # 10 فئات لـ MNIST
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Add this part
+        dummy_input = torch.zeros(1, 1, 28, 28)
+        dummy_out = self.pool(torch.relu(self.conv1(dummy_input)))
+        flat_size = dummy_out.view(1, -1).shape[1]
+
+        self.fc1 = nn.Linear(flat_size, 128)
+        self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
         x = self.pool(x)
-        x = x.view(x.size(0), -1)  # Flatten the tensor
-        assert x.shape[1]
+        x = x.view(x.size(0), -1)
+        x = torch.relu(self.fc1(x))
+        return self.fc2(x)
 
 # بيئة اختيار الأجهزة
 class DeviceSelectionEnv:
@@ -131,20 +138,40 @@ class DDQNAgent:
     def optimize_model(self):
         if self.memory.len() < BATCH_SIZE:
             return
+
         batch = self.memory.sample(BATCH_SIZE)
         states, actions, rewards, next_states = zip(*batch)
+
         states = torch.tensor(np.array(states).reshape(-1, 1, NUM_DEVICES, FEATURES_PER_DEVICE), dtype=torch.float32)
         next_states = torch.tensor(np.array(next_states).reshape(-1, 1, NUM_DEVICES, FEATURES_PER_DEVICE), dtype=torch.float32)
         rewards = torch.tensor(rewards, dtype=torch.float32)
+
+        # Predict Q-values for current and next states
+        q_values = self.policy_net(states)             # (BATCH_SIZE, NUM_DEVICES)
         next_q_values_policy = self.policy_net(next_states).detach()
-        best_actions = torch.argmax(next_q_values_policy, dim=1)
         next_q_values_target = self.target_net(next_states).detach()
-        selected_q_values = next_q_values_target.gather(1, best_actions.unsqueeze(1)).squeeze(1)
-        expected_q_values = rewards + GAMMA * selected_q_values
-        loss = nn.MSELoss()(self.policy_net(states).sum(dim=1), expected_q_values)
+
+        expected_q_values = []
+        predicted_q_values = []
+
+        for i in range(BATCH_SIZE):
+            action_indices = actions[i]
+            q_pred = q_values[i][action_indices]  # Current Q-values of selected actions
+            q_next = next_q_values_target[i][torch.argmax(next_q_values_policy[i])]  # Double DQN target
+
+            # Average current Q-values of selected devices
+            predicted_q_values.append(q_pred.mean())
+            expected_q_values.append(rewards[i] + GAMMA * q_next)
+
+        predicted_q_values = torch.stack(predicted_q_values)
+        expected_q_values = torch.stack(expected_q_values)
+
+        loss = nn.MSELoss()(predicted_q_values, expected_q_values)
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
 
     def update_epsilon(self):
         self.epsilon = min(EPSILON_MAX, self.epsilon * EPSILON_GROWTH)
@@ -154,8 +181,8 @@ class DDQNAgent:
 
 # محاكاة التدريب المحلي لكل عميل
 def local_training(model, num_epochs=5):  # E = 5
-    dummy_input = torch.randn(1, 1, 2, 2)  # Adjust based on expected input shape
-    output = local_model(dummy_input)
+    dummy_input = torch.randn(32, 1, 28, 28)  # Adjust based on expected input shape
+    output = model(dummy_input)
     print("Model Output Shape:", output)
 
     dummy_labels = torch.randint(0, 10, (32,))  # تسميات وهمية
@@ -192,7 +219,8 @@ for episode in range(NUM_EPISODES):
     avg_reward = -float('inf')
 
     # التكرار حتى تحقيق الدقة المطلوبة
-    while avg_reward < DESIRED_ACCURACY and iteration < 100:
+    # while avg_reward < DESIRED_ACCURACY and iteration < 100:
+    while iteration < 5:  # تعديل الشرط للتكرار
         action = agent.select_action(state)  # اختيار العملاء باستخدام DDQN
         next_state, reward, _ = env.step(action)
         agent.memory.push((state, action, reward, next_state))
