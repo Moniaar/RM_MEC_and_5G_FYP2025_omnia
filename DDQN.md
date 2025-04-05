@@ -38,3 +38,13 @@ Mini-batch size means:
 Taking samples from the memory to train the model
 
 Batch size means: taking samples from the pytorch to train the model
+
+
+What is Adam?
+Adam (short for Adaptive Moment Estimation) is an algorithm that adjusts the learning rate for each parameter automatically. It combines the benefits of two other methods:
+
+Momentum (uses past gradients to smooth out updates)
+
+RMSProp (scales learning rate based on past gradient magnitudes)
+
+So, it’s smart, efficient, and works well in practice — which is why it’s used often in reinforcement learning and deep learning.
