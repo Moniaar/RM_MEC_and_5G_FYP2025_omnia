@@ -33,3 +33,8 @@ The algorithm flips a biased coin:
 
 ### In Simple Terms:
 Line 5 is like deciding whether to "try something new" (random action) or "go with what you know works best" (maximize *Q*). The symbol *ε* controls how often you take a chance versus playing it safe.
+
+Mini-batch size means:
+Taking samples from the memory to train the model
+
+Batch size means: taking samples from the pytorch to train the model
