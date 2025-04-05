@@ -16,7 +16,7 @@ EPSILON = 0.1  # معدل الاستكشاف الابتدائي (ε-greedy: 0.1 
 EPSILON_MAX = 1.0  # الحد الأقصى لـ Epsilon
 EPSILON_GROWTH = 1.001  # معدل الزيادة التدريجي لـ Epsilon
 TARGET_UPDATE = 10  # عدد الحلقات قبل تحديث الشبكة الهدف
-NUM_EPISODES = 20  # عدد جولات التدريب العالمية (G = 7000)
+NUM_EPISODES = 5  # عدد جولات التدريب العالمية (G = 7000)
 NUM_DEVICES = 10  # عدد الأجهزة (10 IoT Devices)
 NUM_SELECTED_DEVICES = 4  # عدد الأجهزة المختارة (η = 4)
 FEATURES_PER_DEVICE = 3  # الميزات لكل جهاز (Latency, Bandwidth, Energy Consumption)
@@ -114,7 +114,7 @@ class ReplayMemory:
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
 
-    def len(self):
+    def __len__(self):
         return len(self.memory)
 
 # وكيل DDQN لاختيار العملاء
@@ -136,7 +136,7 @@ class DDQNAgent:
                 return torch.argsort(scores, descending=True)[:NUM_SELECTED_DEVICES].tolist()
 
     def optimize_model(self):
-        if self.memory.len() < BATCH_SIZE:
+        if len(self.memory) < BATCH_SIZE:
             return
 
         batch = self.memory.sample(BATCH_SIZE)
@@ -220,16 +220,53 @@ for episode in range(NUM_EPISODES):
 
     # التكرار حتى تحقيق الدقة المطلوبة
     # while avg_reward < DESIRED_ACCURACY and iteration < 100:
-    while iteration < 5:  # تعديل الشرط للتكرار
-        action = agent.select_action(state)  # اختيار العملاء باستخدام DDQN
+    while iteration < DESIRED_ACCURACY:  # Loop until desired accuracy or max iterations
+        # Line 5: ε-greedy action selection
+        if random.random() < EPSILON:  # With probability ε, select random action
+            action = env.action_space.sample()  # Random action from environment
+        else:  # With probability (1 - ε), select action that maximizes Q(s, a; θ)
+            action = agent.select_action(state)  # Assuming this uses the Q-network
+
         next_state, reward, _ = env.step(action)
-        agent.memory.push((state, action, reward, next_state))
+        # We need to add epsilon greedy exploration here
         agent.optimize_model()
+        # observe new state and reward
         state = next_state
         total_reward += reward
         iteration += 1
         avg_reward = total_reward / iteration if iteration > 0 else reward
+        # Store experience in memory
+        agent.memory.push((state, action, reward, next_state))
+# Line 8: Sample a minibatch of experiences from memory
+        if len(agent.memory) >= BATCH_SIZE:  # Ensure enough experiences in memory
+            experiences = random.sample(agent.memory, BATCH_SIZE)  # Sample m experiences
+            states, actions, rewards, next_states = zip(*experiences)
 
+            # Convert to appropriate format (e.g., numpy arrays or tensors)
+            states = np.array(states)
+            actions = np.array(actions)
+            rewards = np.array(rewards)
+            next_states = np.array(next_states)
+
+# Line 9: Update θ with gradient descent using loss (Equation 18)
+            # Compute target y (Equation 19)
+            # y = R(s, a) + γ * Q'(s', argmax_a' Q(s', a'; θ); θ')
+            q_values_next = agent.model(next_states)  # Q(s', a'; θ)
+            best_actions = np.argmax(q_values_next, axis=1)  # argmax_a' Q(s', a'; θ)
+            target_q_values = agent.target_model(next_states)  # Q'(s', a'; θ')
+            targets = rewards + GAMMA * target_q_values[np.arange(BATCH_SIZE), best_actions]
+
+# Compute current Q-values and loss
+            q_values = agent.model(states)
+            q_values[np.arange(BATCH_SIZE), actions] = targets  # Update with target values
+
+            # Optimize model (gradient descent step)
+            #The loss is implicitly calculated inside agent.optimize_model(states, q_values)
+            agent.optimize_model(states, q_values)  # Assuming this computes loss and updates θ
+
+# Line 10: Regularly reset θ' = θ (update target network)
+        if iteration % TARGET_UPDATE == 0:
+            agent.target_model.load_state_dict(agent.model.state_dict())  # Copy weights to target
 
 # محاكاة التدريب المحلي للعملاء المختارين
         local_weights = []
