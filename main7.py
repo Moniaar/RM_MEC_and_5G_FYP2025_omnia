@@ -10,14 +10,16 @@ from torch.serialization import INT_SIZE
 # تحديث المعاملات بناءً على الورقة العلمية
 GAMMA = 0.99  # عامل التخفيض
 LR = 0.0005  # معدل التعلم
-BATCH_SIZE = 32  # حجم الدفعة التدريبية
+MIN_BATCH_SIZE = 32  # حجم الدفعة التدريبية
 MEMORY_SIZE = 20000  # حجم الذاكرة
 EPSILON = 0.1  # معدل الاستكشاف الابتدائي (ε-greedy: 0.1 → 1)
 EPSILON_MAX = 1.0  # الحد الأقصى لـ Epsilon
 EPSILON_GROWTH = 1.001  # معدل الزيادة التدريجي لـ Epsilon
+EPSILON_MIN = 0.0  # Minimum exploration rate
+EPSILON_DECAY = 0.995  # Decay factor (adjustable)
 TARGET_UPDATE = 10  # عدد الحلقات قبل تحديث الشبكة الهدف
-NUM_EPISODES = 5  # عدد جولات التدريب العالمية (G = 7000)
-NUM_DEVICES = 10  # عدد الأجهزة (10 IoT Devices)
+NUM_EPISODES = 10  # عدد جولات التدريب العالمية (G = 7000)
+NUM_DEVICES = 4  # عدد الأجهزة (10 IoT Devices)
 NUM_SELECTED_DEVICES = 4  # عدد الأجهزة المختارة (η = 4)
 FEATURES_PER_DEVICE = 3  # الميزات لكل جهاز (Latency, Bandwidth, Energy Consumption)
 INPUT_DIM = (NUM_DEVICES, FEATURES_PER_DEVICE)
@@ -33,21 +35,29 @@ L_MAX = 500  # الحد الأقصى للتأخير (L_max = 500 s)
 class CNN(nn.Module):
     def __init__(self, input_channels, output_dim):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=(2, 2), padding=1)  # 2×2 Conv Layer
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(2, 2), padding=1)  # 2×2 Conv Layer
-        self.pool = nn.MaxPool2d(kernel_size=(2, 2))  # 2×2 Pooling Layer
-        self.fc1 = nn.Linear(384, 256)
+        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=(3, 3), padding=1)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=(3, 3), padding=1)
+        self.pool1 = nn.MaxPool2d((2, 2))  # 16×16 → 8×8
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1)
+        self.conv4 = nn.Conv2d(64, 64, kernel_size=(3, 3), padding=1)
+        self.pool2 = nn.MaxPool2d((2, 2))  # 8×8 → 4×4
+        self.fc1 = nn.Linear(64 * 4 * 4, 256)  # 64 channels × 4 × 4 = 1024
         self.fc2 = nn.Linear(256, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
         x = torch.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
+        x = self.pool1(x)  # First pooling
+        x = torch.relu(self.conv3(x))
+        x = torch.relu(self.conv4(x))
+        x = self.pool2(x)  # Second pooling
+        x = x.view(x.size(0), -1)  # Flatten to [batch_size, 1024]
         x = torch.relu(self.fc1(x))
-        return self.fc2(x)
+        x = self.fc2(x)
+        return x
 
-# نموذج عالمي بسيط لمحاكاة التعلم الاتحادي (Global Model)
+
+# نموذج عالمي بسيط لمحاكاة التعلم الاتحادي (Global Model) this will be edited when we have the dataset
 class GlobalModel(nn.Module):
     def __init__(self):
         super(GlobalModel, self).__init__()
@@ -78,7 +88,7 @@ class DeviceSelectionEnv:
         self.action_space = [i for i in range(num_devices)]
 
     def generate_state(self):
-        # توليد قيم واقعية بناءً على الورقة
+        # values from the paper we need to add and configure
         latency = np.random.rand(self.num_devices, 1) * L_MAX  # التأخير بين 0 و L_max (500 ثانية)
         bandwidth = np.random.rand(self.num_devices, 1) * 2  # عرض النطاق بين 0 و 2 ميجابت/ثانية (R = 2 Mbps)
         energy = np.random.rand(self.num_devices, 1) * E_MAX  # استهلاك الطاقة بين 0 و E_max (100)
@@ -87,6 +97,7 @@ class DeviceSelectionEnv:
     def step(self, action):
         selected_devices = np.array(self.state)[action]
         num_selected = len(action)  # m: عدد الأجهزة المختارة
+        # These 2 below needs to get changed into the correct formula according to the paper equations
         total_energy = np.sum(selected_devices[:, 2])  # E: مجموع استهلاك الطاقة
         max_latency = np.max(selected_devices[:, 0])  # L: أقصى تأخير
 
@@ -111,8 +122,8 @@ class ReplayMemory:
     def push(self, transition):
         self.memory.append(transition)
 
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+    def sample(self, min_batch_size):
+        return random.sample(self.memory, min_batch_size)
 
     def __len__(self):
         return len(self.memory)
@@ -122,44 +133,64 @@ class DDQNAgent:
     def __init__(self, input_dim, output_dim):
         self.policy_net = CNN(1, output_dim)
         self.target_net = CNN(1, output_dim)
+        # Adaptive Moment Estimation is an algorithm
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LR)
         self.memory = ReplayMemory(MEMORY_SIZE)
         self.epsilon = EPSILON
 
+    def preprocess_state(self, state):
+        # Convert 10×3 state to 16×16 tensor
+        state_array = np.array(state)  # Shape: [N, 3] where N could be 10 or 4
+        flat_state = state_array.flatten()  # Shape: [N * 3]
+        target_size = 256  # 16 × 16
+        padded_state = np.pad(flat_state, (0, target_size - len(flat_state)), mode='constant', constant_values=0)
+        # 1 Batch size (1 sample at a time)
+        # 1 Number of channels (grayscale "image")
+        # 16 Height and 16 Width (16×16 image)
+        return padded_state.reshape(1, 1, 16, 16)  # Shape: [1, 1, 16, 16]
+        # Flatten to 30 elements and pad to 256 (16×16)
+        # CNN is used to taking the input as 1×16×16
+
+# If a random number (between 0 and 1) is less than self.epsilon, the agent explores an action
     def select_action(self, state):
         if random.random() < self.epsilon:
             return random.sample(range(len(state)), NUM_SELECTED_DEVICES)
         else:
+            # no_grad is used to reduce memory consumption for computations
             with torch.no_grad():
-                state_tensor = torch.tensor(np.array(state).reshape(1, 1, NUM_DEVICES, FEATURES_PER_DEVICE), dtype=torch.float32)
+                # Converts the preprocessed state into a PyTorch tensor suitable for input to the neural networ
+                state_tensor = torch.tensor(self.preprocess_state(state), dtype=torch.float32)
+                # Passes the state_tensor through the policy network to get Q-values (or scores) for all possible
+                # actions and removes unnecessary dimensions from the output.
+                # the squeeze function Removes dimensions of size 1 from the tensor. Here, it converts the [1, 10]
                 scores = self.policy_net(state_tensor).squeeze()
                 return torch.argsort(scores, descending=True)[:NUM_SELECTED_DEVICES].tolist()
 
     def optimize_model(self):
-        if len(self.memory) < BATCH_SIZE:
+        if len(self.memory) < MIN_BATCH_SIZE:
             return
 
-        batch = self.memory.sample(BATCH_SIZE)
+        batch = self.memory.sample(MIN_BATCH_SIZE)
         states, actions, rewards, next_states = zip(*batch)
-
-        states = torch.tensor(np.array(states).reshape(-1, 1, NUM_DEVICES, FEATURES_PER_DEVICE), dtype=torch.float32)
-        next_states = torch.tensor(np.array(next_states).reshape(-1, 1, NUM_DEVICES, FEATURES_PER_DEVICE), dtype=torch.float32)
+# Converts the sampled states and next_states into tensors of shape
+# [32, 1, 16, 16] using self.preprocess_state, and converts rewards into a tensor
+        states = torch.tensor([self.preprocess_state(s) for s in states], dtype=torch.float32)
+        next_states = torch.tensor([self.preprocess_state(s) for s in next_states], dtype=torch.float32)
         rewards = torch.tensor(rewards, dtype=torch.float32)
 
-        # Predict Q-values for current and next states
-        q_values = self.policy_net(states)             # (BATCH_SIZE, NUM_DEVICES)
+        # Predict Q-values
+        q_values = self.policy_net(states)  # Shape: [MIN_BATCH_SIZE, NUM_DEVICES]
         next_q_values_policy = self.policy_net(next_states).detach()
         next_q_values_target = self.target_net(next_states).detach()
 
         expected_q_values = []
         predicted_q_values = []
 
-        for i in range(BATCH_SIZE):
+        for i in range(MIN_BATCH_SIZE):
             action_indices = actions[i]
-            q_pred = q_values[i][action_indices]  # Current Q-values of selected actions
+            q_pred = q_values[i][action_indices]  # Q-values of selected actions
+            # Bellman Equation lies here
             q_next = next_q_values_target[i][torch.argmax(next_q_values_policy[i])]  # Double DQN target
-
-            # Average current Q-values of selected devices
             predicted_q_values.append(q_pred.mean())
             expected_q_values.append(rewards[i] + GAMMA * q_next)
 
@@ -167,14 +198,12 @@ class DDQNAgent:
         expected_q_values = torch.stack(expected_q_values)
 
         loss = nn.MSELoss()(predicted_q_values, expected_q_values)
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-
     def update_epsilon(self):
-        self.epsilon = min(EPSILON_MAX, self.epsilon * EPSILON_GROWTH)
+        self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
 
     def update_target_network(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -222,8 +251,9 @@ for episode in range(NUM_EPISODES):
     # while avg_reward < DESIRED_ACCURACY and iteration < 100:
     while iteration < DESIRED_ACCURACY:  # Loop until desired accuracy or max iterations
         # Line 5: ε-greedy action selection
+        # Line 5: ε-greedy action selection
         if random.random() < EPSILON:  # With probability ε, select random action
-            action = env.action_space.sample()  # Random action from environment
+            action = random.sample(env.action_space, NUM_SELECTED_DEVICES)  # Select 4 random devices
         else:  # With probability (1 - ε), select action that maximizes Q(s, a; θ)
             action = agent.select_action(state)  # Assuming this uses the Q-network
 
@@ -238,8 +268,8 @@ for episode in range(NUM_EPISODES):
         # Store experience in memory
         agent.memory.push((state, action, reward, next_state))
 # Line 8: Sample a minibatch of experiences from memory
-        if len(agent.memory) >= BATCH_SIZE:  # Ensure enough experiences in memory
-            experiences = random.sample(agent.memory, BATCH_SIZE)  # Sample m experiences
+        if len(agent.memory) >= MIN_BATCH_SIZE:  # Ensure enough experiences in memory
+            experiences = agent.memory.sample(MIN_BATCH_SIZE)  # Sample m experiences
             states, actions, rewards, next_states = zip(*experiences)
 
             # Convert to appropriate format (e.g., numpy arrays or tensors)
@@ -254,11 +284,11 @@ for episode in range(NUM_EPISODES):
             q_values_next = agent.model(next_states)  # Q(s', a'; θ)
             best_actions = np.argmax(q_values_next, axis=1)  # argmax_a' Q(s', a'; θ)
             target_q_values = agent.target_model(next_states)  # Q'(s', a'; θ')
-            targets = rewards + GAMMA * target_q_values[np.arange(BATCH_SIZE), best_actions]
+            targets = rewards + GAMMA * target_q_values[np.arange(MIN_BATCH_SIZE), best_actions]
 
 # Compute current Q-values and loss
             q_values = agent.model(states)
-            q_values[np.arange(BATCH_SIZE), actions] = targets  # Update with target values
+            q_values[np.arange(MIN_BATCH_SIZE), actions] = targets  # Update with target values
 
             # Optimize model (gradient descent step)
             #The loss is implicitly calculated inside agent.optimize_model(states, q_values)
