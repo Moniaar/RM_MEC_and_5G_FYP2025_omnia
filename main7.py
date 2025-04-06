@@ -1,3 +1,4 @@
+# This code is based on a dummy input and not on our database (CIFAR-10)
 import numpy as np
 import torch
 import torch.nn as nn
