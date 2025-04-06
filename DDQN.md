@@ -48,3 +48,6 @@ Momentum (uses past gradients to smooth out updates)
 RMSProp (scales learning rate based on past gradient magnitudes)
 
 So, it’s smart, efficient, and works well in practice — which is why it’s used often in reinforcement learning and deep learning.
+
+How is CIFAR-10 Dataset used here?:
+Each class contains an equal distribution, boasting 6,000 images. From the total image count, 50,000 are designated for training while the remaining 10,000 are set aside for testing.
