@@ -31,6 +31,7 @@ ALPHA_E = 2.0  # معامل استهلاك الطاقة (α_e = 2)
 ALPHA_L = 2.0  # معامل التأخير (α_l = 2)
 E_MAX = 100  # الحد الأقصى لاستهلاك الطاقة (E_max = 100)
 L_MAX = 500  # الحد الأقصى للتأخير (L_max = 500 s)
+MAX_ITERATIONS = 2  # الحد الأقصى لعدد التكرارات في كل حلقة
 
 # نموذج CNN لاختيار الأجهزة (DDQN) وللنموذج العالمي
 class CNN(nn.Module):
@@ -199,12 +200,15 @@ class DDQNAgent:
 
         predicted_q_values = torch.stack(predicted_q_values)
         expected_q_values = torch.stack(expected_q_values)
-
+# يقوم بحساب الفرق (الخسارة) بين القيم المتوقعة (predicted_q_values) والقيم المتوقعة الحقيقية 
+# (expected_q_values) باستخدام دالة الخسارة MSE (متوسط مربع الخطأ). ثم يقوم بتهيئة المُحسّن (optimizer) لتصفير التدرجات، ويحسب التدرجات العكسية للخسارة،
+# وأخيرًا يحدّث معايير النموذج بناءً على هذه التدرجات لتحسين الأداء
         loss = nn.MSELoss()(predicted_q_values, expected_q_values)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
+# تقليل الاستكشاف العشوائي تدريجيًا مع تحسن أداء الوكيل (agent) وزيادة الاعتماد على السياسة المستفادة
     def update_epsilon(self):
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
 
@@ -213,22 +217,38 @@ class DDQNAgent:
 
 # تعريف الدوال
 def local_training(model, trainloader, num_epochs=5):
+    # تعريف معيار الخسارة (loss function) باستخدام CrossEntropyLoss من مكتبة PyTorch.
+    # هذا المعيار يُستخدم عادةً في مسائل التصنيف لقياس الفرق بين التوقعات والقيم الحقيقية
     criterion = nn.CrossEntropyLoss()
+    # model.parameters(): يمرر جميع المعاملات القابلة للتدريب في النموذج
     optimizer = optim.Adam(model.parameters(), lr=LR)
+    # Batch normalization a layer that allows every layer of the network to do learning more independently.
+    # It is used to normalize the output of the previous layers.
+    # Dropout is a regularization technique to prevent overfitting, Dropouts are the regularization technique that is used to prevent overfitting in the model.
+    # It is added to randomly switching some percentage of neurons of the network
+    # We use the .train() method to make sure these two layers aren't misbehaving during training.
     model.train()
     print("Starting local training...")
     for epoch in range(num_epochs):
+        # الدالة enumerate هي دالة مدمجة في Python تُستخدم لإضافة عداد (counter) إلى كائن قابل للتكرار.
+        # بدلاً من أن تُعيد فقط العناصر من الكائن القابل للتكرار (مثل trainloader)، فإنها تُعيد زوجًا (tuple)
         for i, data in enumerate(trainloader):
             inputs, labels = data
+            # تُعاد تعيين التدرجات (gradients) إلى الصفر لتجنب تراكمها من الخطوات السابقة.
             optimizer.zero_grad()
+            # السطر ده مفروض يتغير لم ندخل ليهو البيانات من الاجهزة المشاركة في التدريب
+            # الخرج (outputs) هو ما يتنبأ به النموذج بناءً على أوزانه الحالية
+            #  التسمية (labels) هي الحقيقة التي نريد من النموذج أن يتعلمها
             outputs = model(inputs)
             loss = criterion(outputs, labels)
+            # يتم حساب التدرجات (gradients) لجميع المعاملات في النموذج باستخدام الانتشار العكسي (backpropagation)
             loss.backward()
             optimizer.step()
             if i % 10 == 0:  # طباعة تقدم كل 10 دفعات
                 print(f"Epoch {epoch+1}, Batch {i}, Loss: {loss.item():.4f}")
     return model.state_dict()
 
+# This function is gonna be edited later on
 def aggregate_weights(global_model, local_weights, client_data_sizes=None):
     global_dict = global_model.state_dict()
     num_clients = len(local_weights)
@@ -238,20 +258,30 @@ def aggregate_weights(global_model, local_weights, client_data_sizes=None):
     
     for key in global_dict.keys():
         stacked_weights = torch.stack([weights[key] for weights in local_weights], dim=0)
+        # Equation 1
         weighted_sum = sum(client_data_sizes[k] * stacked_weights[k] for k in range(num_clients))
         global_dict[key] = weighted_sum / total_data_size
-    
+    # يحمل القاموس المحدث إلى النموذج العام.
     global_model.load_state_dict(global_dict)
     return global_model
 
 def evaluate_accuracy(model, testloader):
+    # يضع النموذج في وضع التقييم (بدلاً من التدريب)، مما يعني أنه لن يتم تعديل أوزانه أو تحديثها
     model.eval()
+    # لحساب عدد التنبؤات الصحيحة
     correct = 0
+    # لحساب العدد الإجمالي للعينات
     total = 0
+    # لا نريد حساب التدرجات أثناء التقييم، لذا نستخدم torch.no_grad()
+    # هذا يساعد في تقليل استخدام الذاكرة وزيادة السرعة
     with torch.no_grad():
         for data in testloader:
+            # الصور التي سيتم اختبار النموذج عليها
+            # التسميات الحقيقية (الإجابات الصحيحة) لتلك الصور
             images, labels = data
             outputs = model(images)
+            # 1: يشير إلى البعد (dimension) الذي نريد أخذ القيمة القصوى منه.
+            # _: يتم تجاهل القيم القصوى نفسها، ونأخذ فقط الفئات المتوقعة (predicted).
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
@@ -310,7 +340,9 @@ if __name__ == '__main__':
             local_weights = []
             for client_id in action:
                 local_model = GlobalModel()
+                # عند استدعاء global_model.state_dict()، يتم استخراج جميع الأوزان والمعاملات القابلة للتعلم في النموذج العام كقاموس
                 local_model.load_state_dict(global_model.state_dict())
+                # the devices uses certain data to train the model (1MB) from the dataset only
                 local_weights.append(local_training(local_model, trainloader))
 
             global_model = aggregate_weights(global_model, local_weights)
