@@ -3,6 +3,9 @@
 ## We need to do the following:
 1. A function that splits the data from the devices, collect 1MB from the dataset
 2. The 2 lines that downloads the datasets, which one will we use 1,000 or 5,000
+3. function to distribute the dataset on the devices
+4. function to select 1MB from the devices that are included in the training
+
 
 ### Line 5:
 **"Select an action *a* randomly with probability *ε* or *a = arg max_{a∈A} Q(s_k, a; θ)* with probability *(1 − ε)*."**
