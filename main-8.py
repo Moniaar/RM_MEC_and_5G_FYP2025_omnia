@@ -17,9 +17,9 @@ EPSILON = 0.1  # معدل الاستكشاف الابتدائي (ε-greedy: 0.1 
 EPSILON_MAX = 1.0  # الحد الأقصى لـ Epsilon
 EPSILON_GROWTH = 1.001  # معدل الزيادة التدريجي لـ Epsilon
 EPSILON_MIN = 0.0  # Minimum exploration rate
-EPSILON_DECAY = 0.995  # Decay factor (adjustable)
+EPSILON_DECAY = 0.999  # Decay factor (adjustable)
 TARGET_UPDATE = 10  # عدد الحلقات قبل تحديث الشبكة الهدف
-NUM_EPISODES = 10  # عدد جولات التدريب العالمية (G = 7000)
+NUM_EPISODES = 4  # عدد جولات التدريب العالمية (G = 7000)
 NUM_DEVICES = 4  # عدد الأجهزة (10 IoT Devices)
 NUM_SELECTED_DEVICES = 4  # عدد الأجهزة المختارة (η = 4)
 FEATURES_PER_DEVICE = 3  # الميزات لكل جهاز (Latency, Bandwidth, Energy Consumption)
@@ -31,7 +31,7 @@ ALPHA_E = 2.0  # معامل استهلاك الطاقة (α_e = 2)
 ALPHA_L = 2.0  # معامل التأخير (α_l = 2)
 E_MAX = 100  # الحد الأقصى لاستهلاك الطاقة (E_max = 100)
 L_MAX = 500  # الحد الأقصى للتأخير (L_max = 500 s)
-MAX_ITERATIONS = 2  # الحد الأقصى لعدد التكرارات في كل حلقة
+MAX_ITERATIONS = 10  # الحد الأقصى لعدد التكرارات في كل حلقة
 
 # نموذج CNN لاختيار الأجهزة (DDQN) وللنموذج العالمي
 class CNN(nn.Module):
@@ -94,8 +94,9 @@ class DeviceSelectionEnv:
         return np.hstack((latency, bandwidth, energy))
 
     def step(self, action):
-        selected_devices = np.array(self.state)[action]
-        num_selected = len(action)  # m: عدد الأجهزة المختارة
+        selected_indices = [i for i, val in enumerate(action) if val == 1]
+        selected_devices = np.array(self.state)[selected_indices]
+        num_selected = len(selected_indices)  # m: عدد الأجهزة المختارة
         # These 2 below needs to get changed into the correct formula according to the paper equations
         total_energy = np.sum(selected_devices[:, 2])  # E: مجموع استهلاك الطاقة
         max_latency = np.max(selected_devices[:, 0])  # L: أقصى تأخير
@@ -106,7 +107,9 @@ class DeviceSelectionEnv:
                   - ALPHA_E * (total_energy / E_MAX)
                   - ALPHA_L * (max_latency / L_MAX))
         self.state = self.generate_state()
-        return self.state, reward, False
+        done = False
+        # إذا كانت المكافأة أقل من 0، فإننا نعتبرها نهاية الحلقة
+        return self.state, reward, done
 
     def reset(self):
         self.state = self.generate_state()
@@ -177,10 +180,10 @@ class DDQNAgent:
             return
         batch = self.memory.sample(MIN_BATCH_SIZE)
         states, actions, rewards, next_states = zip(*batch)
-# Converts the sampled states and next_states into tensors of shape
-# [32, 1, 16, 16] using self.preprocess_state, and converts rewards into a tensor
-        states = torch.tensor([self.preprocess_state(s) for s in states], dtype=torch.float32)
-        next_states = torch.tensor([self.preprocess_state(s) for s in next_states], dtype=torch.float32)
+
+        # Convert states and next_states to 4D tensors
+        states = torch.tensor(np.stack([self.preprocess_state(s) for s in states]), dtype=torch.float32)  # Shape: [32, 1, 16, 16]
+        next_states = torch.tensor(np.stack([self.preprocess_state(s) for s in next_states]), dtype=torch.float32)  # Shape: [32, 1, 16, 16]
         rewards = torch.tensor(rewards, dtype=torch.float32)
 
         # Predict Q-values
@@ -191,24 +194,25 @@ class DDQNAgent:
         expected_q_values = []
         predicted_q_values = []
         for i in range(MIN_BATCH_SIZE):
-            action_indices = actions[i]
+            action_indices = [idx for idx, val in enumerate(actions[i]) if val == 1]  # Binary action to indices
             q_pred = q_values[i][action_indices]  # Q-values of selected actions
-            # Bellman Equation lies here
+            # Bellman equation lies here
             q_next = next_q_values_target[i][torch.argmax(next_q_values_policy[i])]  # Double DQN target
             predicted_q_values.append(q_pred.mean())
             expected_q_values.append(rewards[i] + GAMMA * q_next)
 
         predicted_q_values = torch.stack(predicted_q_values)
         expected_q_values = torch.stack(expected_q_values)
-# يقوم بحساب الفرق (الخسارة) بين القيم المتوقعة (predicted_q_values) والقيم المتوقعة الحقيقية 
-# (expected_q_values) باستخدام دالة الخسارة MSE (متوسط مربع الخطأ). ثم يقوم بتهيئة المُحسّن (optimizer) لتصفير التدرجات، ويحسب التدرجات العكسية للخسارة،
-# وأخيرًا يحدّث معايير النموذج بناءً على هذه التدرجات لتحسين الأداء
+        # يقوم بحساب الفرق (الخسارة) بين القيم المتوقعة (predicted_q_values) والقيم المتوقعة الحقيقية 
+        # (expected_q_values) باستخدام دالة الخسارة MSE (متوسط مربع الخطأ). ثم يقوم بتهيئة المُحسّن (optimizer) لتصفير التدرجات، ويحسب التدرجات العكسية للخسارة،
+        # وأخيرًا يحدّث معايير النموذج بناءً على هذه التدرجات لتحسين الأداء
+
         loss = nn.MSELoss()(predicted_q_values, expected_q_values)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-# تقليل الاستكشاف العشوائي تدريجيًا مع تحسن أداء الوكيل (agent) وزيادة الاعتماد على السياسة المستفادة
+    # تقليل الاستكشاف العشوائي تدريجيًا مع تحسن أداء الوكيل (agent) وزيادة الاعتماد على السياسة المستفادة
     def update_epsilon(self):
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
 
@@ -304,7 +308,7 @@ if __name__ == '__main__':
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
     # تحديد حزمة معينة من البيانات (1000 صورة)
     # لتقليل وقت التدريب
-    subset_indices = list(range(1000))
+    subset_indices = list(range(5000))
     trainset = torch.utils.data.Subset(trainset, subset_indices)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=2)
 
@@ -338,15 +342,22 @@ if __name__ == '__main__':
             avg_reward = total_reward / iteration if iteration > 0 else reward
 
             local_weights = []
-            for client_id in action:
+            # Train only selected devices (where action[i] == 1)
+            selected_indices = [i for i, val in enumerate(action) if val == 1]
+            for client_id in selected_indices:
                 local_model = GlobalModel()
                 # عند استدعاء global_model.state_dict()، يتم استخراج جميع الأوزان والمعاملات القابلة للتعلم في النموذج العام كقاموس
                 local_model.load_state_dict(global_model.state_dict())
                 # the devices uses certain data to train the model (1MB) from the dataset only
                 local_weights.append(local_training(local_model, trainloader))
 
-            global_model = aggregate_weights(global_model, local_weights)
-            accuracy = evaluate_accuracy(global_model, testloader)
+            if local_weights:  # Ensure there are weights to aggregate
+                print(f"Pre-Aggregation Accuracy: {evaluate_accuracy(global_model, testloader):.4f}")
+                global_model = aggregate_weights(global_model, local_weights)
+                print(f"Post-Aggregation Accuracy: {evaluate_accuracy(global_model, testloader):.4f}")
+                accuracy = evaluate_accuracy(global_model, testloader)
+            else:
+                print("No devices selected, skipping aggregation.")
             print(f"Iteration {iteration}, Total Reward: {total_reward:.2f}, Avg Reward: {avg_reward:.2f}")
 
         agent.update_epsilon()
