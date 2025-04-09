@@ -166,6 +166,7 @@ class DDQNAgent:
         else:
             # استغلال: اختيار العملاء بناءً على الشبكة
             with torch.no_grad():
+                # Use this later to select devices depending on state tensor as an average 
                 state_tensor = torch.tensor(self.preprocess_state(state), dtype=torch.float32)
                 scores = self.policy_net(state_tensor).squeeze()
                 # اختيار أعلى num_selected عملاء (يمكن أن يكون أقل من n)
