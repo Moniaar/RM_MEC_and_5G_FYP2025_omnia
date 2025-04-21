@@ -73,3 +73,11 @@ Below is the translated comparison table in Arabic, covering all aspects from th
 
 How is CIFAR-10 Dataset used here?:
 Each class contains an equal distribution, boasting 6,000 images. From the total image count, 50,000 are designated for training while the remaining 10,000 are set aside for testing.
+
+يتم حساب `B_k` مرتين في الكود لأغراض مختلفة:
+
+1. **في `EdgeDevice.train_local_model`**: يُحسب `B_k` لتقييم استهلاك الطاقة أثناء تدريب النموذج المحلي على الجهاز، ويُستخدم لتحديد ما إذا كانت الطاقة المتوفرة كافية للتدريب ولتحديث حالة الطاقة.
+
+2. **في `DeviceSelectionEnv.step`**: يُحسب `B_k` مرة أخرى لتحديث الحد الأقصى للطاقة لكل جهاز (`e_max_per_device`) بعد اختيار الأجهزة وتنفيذ جولة التدريب، مما يؤثر على حساب المكافأة وحالة البيئة.
+
+الحساب المكرر ضروري لأن كل سياق يستخدم `B_k` بشكل مستقل لإدارة الطاقة في مراحل مختلفة من المحاكاة.
