@@ -27,8 +27,8 @@ EPSILON_MAX = 1.0
 EPSILON_GROWTH = 1.001
 EPSILON_MIN = 0.0
 EPSILON_DECAY = 0.999
-TARGET_UPDATE = 20
-NUM_EPISODES = 200
+TARGET_UPDATE = 2
+NUM_EPISODES = 20
 NUM_DEVICES = 4
 FEATURES_PER_DEVICE = 3
 INPUT_DIM = (NUM_DEVICES, FEATURES_PER_DEVICE)
@@ -54,18 +54,20 @@ class CNN(nn.Module):
         self.conv1 = nn.Conv2d(input_channels, 16, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.fc1 = nn.Linear(32 * 8 * 8, 128)
-        self.fc2 = nn.Linear(128, output_dim)
+        self.fc1 = nn.Linear(32 * 8 * 8, 64)  # من الطبقة الطيّ إلى 64 وحدة
+        self.fc2 = nn.Linear(64, 64)          # 64 إلى 64 وحدة
+        self.fc3 = nn.Linear(64, 64)          # 64 إلى 64 وحدة
+        self.fc4 = nn.Linear(64, output_dim)  # من 64 إلى فضاء الإجراء
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
         x = self.pool(x)
         x = torch.relu(self.conv2(x))
-        # tells PyTorch to automatically calculate the size of the second dimension
-        # so that the total number of elements in the tensor remains the same.
-        x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)  # تسطيح الإدخال
         x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = torch.relu(self.fc2(x))
+        x = torch.relu(self.fc3(x))
+        x = self.fc4(x)  # بدون تنشيط في طبقة الإخراج
         return x
 
 # Global Model for federated learning
@@ -490,16 +492,12 @@ if __name__ == "__main__":
         agent.update_epsilon()
         if episode % TARGET_UPDATE == 0:
             # Update the target network every TARGET_UPDATE episodes
-            # 
             agent.update_target_network()
 
         rewards_per_episode.append(total_reward)
         episode_energy_history.append(episode_energy / episode_iterations if episode_iterations > 0 else 0)
         episode_bandwidth_history.append(episode_bandwidth / episode_iterations if episode_iterations > 0 else 0)
         print(f"Episode {episode+1} Finished, Total Reward: {total_reward:.2f}, Avg Reward: {avg_reward:.2f}, Iterations: {iteration}, Accuracy: {accuracy:.2f}, Energy: {episode_energy_history[-1]:.2f}, Bandwidth: {episode_bandwidth_history[-1]:.2f}")
-
-    torch.save(agent.policy_net.state_dict(), "ddqn_model.pt")
-    torch.save(mec_server.global_model.state_dict(), "global_model.pt")
 
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 3, 1)
