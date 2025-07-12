@@ -14,7 +14,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler('150ep_20it_1ta_12_7_1.txt', mode='a'),
+        logging.FileHandler('150ep_20it_1ta_12_7_MINST.txt', mode='a'),
         logging.StreamHandler()
     ]
 )
