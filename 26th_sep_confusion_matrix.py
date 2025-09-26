@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler('miniset_9_aug.txt', mode='a'),
+        logging.FileHandler('miniset_confusion_matrix_sep26.txt', mode='a'),
         logging.StreamHandler()
     ]
 )
@@ -520,6 +520,8 @@ if __name__ == "__main__":
     episode_accuracies = []
     iteration_accuracies = []
     episode_latency_history = []
+    all_preds_list = []  # List to store predictions for all iterations
+    all_targets_list = []  # List to store targets for all iterations
 
     for episode in range(NUM_EPISODES):
         logging.info(f"\nStarting Episode {episode+1}")
@@ -549,6 +551,8 @@ if __name__ == "__main__":
             accuracy, all_preds, all_targets = mec_server.evaluate_global_model(testloader)
             max_accuracy = max(max_accuracy, accuracy)
             iteration_accuracies.append(accuracy)
+            all_preds_list.append(all_preds)  # Append predictions for this iteration
+            all_targets_list.append(all_targets)  # Append targets for this iteration
             logging.info(f"Iteration {iteration}, Total Reward: {total_reward:.2f}, Avg Reward: {avg_reward:.2f}, Accuracy: {accuracy:.4f}, max_accuracy: {max_accuracy:.2f}, Energy: {episode_energy:.2f}, Bandwidth: {episode_bandwidth:.2f}")
         agent.update_epsilon()
         if episode % TARGET_UPDATE == 0:
@@ -566,6 +570,13 @@ if __name__ == "__main__":
     logging.info(f"Episode Accuracies so far: {episode_accuracies}")
     total_accuracy = np.mean(episode_accuracies) if episode_accuracies else 0
     logging.info(f"Total Accuracy across all episodes: {total_accuracy:.4f}")
+
+    # Plot Confusion Matrix using predictions from 160th iteration
+    if len(all_preds_list) >= 160 and len(all_targets_list) >= 160:
+        classes = [str(i) for i in range(10)]  # MNIST classes (0-9)
+        plot_confusion_matrix(all_targets_list[159], all_preds_list[159], classes)
+    else:
+        logging.warning("Confusion matrix could not be plotted: Fewer than 160 iterations completed")
 
     # Plot Confusion Matrix
     classes = [str(i) for i in range(10)]  # MNIST classes (0-9)
