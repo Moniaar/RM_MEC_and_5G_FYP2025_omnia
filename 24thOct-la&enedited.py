@@ -490,11 +490,11 @@ class DDQNAgent:
         states, actions, rewards, next_states = zip(*batch)
         states = torch.tensor(np.stack([self.preprocess_state(s) for s in states]), dtype=torch.float32)
         next_states = torch.tensor(np.stack([self.preprocess_state(s) for s in next_states]), dtype=torch.float32)
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-        
-        q_values = self.policy_net(states).squeeze()
-        next_q_values_policy = self.policy_net(next_states).detach().squeeze()
-        next_q_values_target = self.target_net(next_states).detach().squeeze()
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).view(-1)
+
+        q_values = self.policy_net(states)
+        next_q_values_policy = self.policy_net(next_states).detach()
+        next_q_values_target = self.target_net(next_states).detach()
 
         expected_q_values = []
         predicted_q_values = []
@@ -511,6 +511,8 @@ class DDQNAgent:
         
         predicted_q_values = torch.stack(predicted_q_values)
         expected_q_values = torch.stack(expected_q_values)
+        if expected_q_values.ndim > 1:
+            expected_q_values = expected_q_values.mean(dim=1)
         loss = nn.MSELoss()(predicted_q_values, expected_q_values)
         self.optimizer.zero_grad()
         loss.backward()
