@@ -13,7 +13,7 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 from collections import Counter
 import matplotlib
-matplotlib.use('Agg') # ضبط backend متوافق
+matplotlib.use('Agg')
 
 # Setup logging
 logging.basicConfig(
