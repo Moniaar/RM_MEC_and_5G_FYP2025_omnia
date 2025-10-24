@@ -12,15 +12,13 @@ import logging
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 from collections import Counter
-import matplotlib
-matplotlib.use('Agg') # ضبط backend متوافق
 
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler('24Oct-output.txt', mode='a'),
+        logging.FileHandler('24Oct-2devices-output.txt', mode='a'),
         logging.StreamHandler()
     ]
 )
@@ -429,7 +427,7 @@ class DeviceSelectionEnv:
                   - ALPHA_L * (max_latency / L_MAX))
 
         state = self.generate_state()
-        logging.info(f"Round: reward={reward:.2f}, energy={total_energy_consumed}, bandwidth={total_bandwidth:.2f}")
+        logging.info(f"Round: reward={float(np.mean(reward)):.2f}, energy={total_energy_consumed}, bandwidth={total_bandwidth:.2f}")
         return state, reward, max_latency, mean_iteration_energy
 
     def reset(self):
@@ -582,7 +580,7 @@ if __name__ == "__main__":
             total_reward += reward
             iteration += 1
             episode_iterations += 1
-            episode_energy += mec_server.energy_history[-1] if mec_server.energy_history else 0
+            episode_energy += sum(mec_server.energy_history[-1]) if mec_server.energy_history else 0
             episode_bandwidth += mec_server.bandwidth_history[-1] if mec_server.bandwidth_history else 0
             avg_reward = total_reward / iteration if iteration > 0 else reward
 
@@ -593,7 +591,7 @@ if __name__ == "__main__":
             all_targets_list.append(all_targets)
             episode_latency_list.append(max_latency)
             episode_energy_list.append(mean_iteration_energy)
-            logging.info(f"Iteration {iteration}, total_reward: {total_reward:.2f}, avg_reward: {avg_reward:.2f}, "
+            logging.info(f"Iteration {iteration}, total_reward: {float(np.mean(total_reward)):.2f}, avg_reward: {float(np.mean(avg_reward)):.2f}, "
                         f"accuracy: {accuracy:.4f}, max_accuracy: {max_accuracy:.2f}, energy: {episode_energy:.2f}, "
                         f"bandwidth: {episode_bandwidth:.2f}")
 
@@ -618,7 +616,7 @@ if __name__ == "__main__":
     if len(all_preds_list) >= 160 and len(all_targets_list) >= 160:
         classes = [str(i) for i in range(10)]  # فئات MNIST (0-9)
         plot_confusion_matrix(all_targets_list[159], all_preds_list[159], classes)
-        plt.savefig('confusion_matrix_fixed_en_lat_oct10.png')  # حفظ مصفوفة الالتباس
+        plt.savefig('confusion_matrix_fixed_en_lat_2devices_oct24.png')  # حفظ مصفوفة الالتباس
         plt.close()
     else:
         logging.warning("Cannot plot confusion matrix: fewer than 160 iterations completed")
@@ -630,7 +628,7 @@ if __name__ == "__main__":
     plt.ylabel("Energy (pJ)")
     plt.title("Energy Consumption")
     plt.legend()
-    plt.savefig('energy per episode_fixed_en_lat_oct24.txt.png')
+    plt.savefig('energy per 2devices.txt.png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
@@ -639,7 +637,7 @@ if __name__ == "__main__":
     plt.ylabel("Latency (s)")
     plt.title("Latency per Episode")
     plt.legend()
-    plt.savefig('Latency per episode_fixed_en_lat_oct24.png')
+    plt.savefig('Latency per 2devices.txt.png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
@@ -648,7 +646,7 @@ if __name__ == "__main__":
     plt.ylabel("Accuracy")
     plt.title("Model accuracy across episodes")
     plt.legend()
-    plt.savefig('Accuracy per iteration1_fixed_en_lat_oct24.png')
+    plt.savefig('Accuracy per 2devices.txt.png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
@@ -657,5 +655,5 @@ if __name__ == "__main__":
     plt.ylabel("Accuracy")
     plt.title("Model accuracy during first 160 iterations")
     plt.legend()
-    plt.savefig('Accuracy per for 160 iteration1_fixed_en_lat_oct24.png')
+    plt.savefig('Accuracy per for 160 for 2devices.txt.png')
     plt.close()
