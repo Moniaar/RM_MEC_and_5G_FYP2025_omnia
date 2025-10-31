@@ -1,4 +1,4 @@
-#  غيرنا عشان نحسن الطاقه والتاخير
+# كود سيفار و غيرنا عشان نحسن الطاقه والتاخير
 import numpy as np
 import torch
 import torch.nn as nn
