@@ -20,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
     handlers=[
-        logging.FileHandler('24Oct-output.txt', mode='a'),
+        logging.FileHandler('CIFAR-31Oct-24Oct-output.txt', mode='a'),
         logging.StreamHandler()
     ]
 )
@@ -612,7 +612,7 @@ if __name__ == "__main__":
         classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
            'dog', 'frog', 'horse', 'ship', 'truck']
         plot_confusion_matrix(all_targets_list[159], all_preds_list[159], classes)
-        plt.savefig('confusion_matrix_fixed_en_lat_oct10.png')  # حفظ مصفوفة الالتباس
+        plt.savefig('confusion_matrix_fixed_en_lat_CIFAR10-Oct24-Oct24.png')  # حفظ مصفوفة الالتباس
         plt.close()
     else:
         logging.warning("Cannot plot confusion matrix: fewer than 160 iterations completed")
@@ -624,7 +624,7 @@ if __name__ == "__main__":
     plt.ylabel("Energy (pJ)")
     plt.title("Energy Consumption")
     plt.legend()
-    plt.savefig('energy per episode_fixed_en_lat_oct24.txt.png')
+    plt.savefig('energy per episode_fixed_en_lat_CIFAR10-Oct24-Oct31png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
@@ -633,7 +633,7 @@ if __name__ == "__main__":
     plt.ylabel("Latency (s)")
     plt.title("Latency per Episode")
     plt.legend()
-    plt.savefig('Latency per episode_fixed_en_lat_oct24.png')
+    plt.savefig('Latency per episode_fixed_en_lat_CIFAR10-Oct24-Oct31.png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
@@ -642,14 +642,14 @@ if __name__ == "__main__":
     plt.ylabel("Accuracy")
     plt.title("Model accuracy across episodes")
     plt.legend()
-    plt.savefig('Accuracy per iteration1_fixed_en_lat_oct24.png')
+    plt.savefig('Accuracy per iteration1_fixed_en_lat_CIFAR-31Oct-24Oct.png')
     plt.close()
 
     plt.figure(figsize=(10, 6))
-    plt.plot(iteration_accuracies[:160], label="Accuracy per iteration (first 160)")
+    plt.plot(iteration_accuracies[:160], label="CIFAR10-Accuracy per iteration (first 160)")
     plt.xlabel("Iteration")
     plt.ylabel("Accuracy")
-    plt.title("Model accuracy during first 160 iterations")
+    plt.title("CIFAR10-Model accuracy during first 160 iterations")
     plt.legend()
-    plt.savefig('Accuracy per for 160 iteration1_fixed_en_lat_oct24.png')
+    plt.savefig('Accuracy per for 160 iteration1_fixed_en_lat_CIFAR10-Oct24-Oct31.png')
     plt.close()
